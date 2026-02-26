@@ -1,67 +1,82 @@
+const Genius = require("genius-lyrics");
+
+const Client = new Genius.Client(); 
+// Bisa isi token kalau punya:
+// const Client = new Genius.Client("GENIUS_ACCESS_TOKEN");
+
 module.exports = {
-  name: "Cek XL / AXIS",
-  desc: "Cek status nomor XL / AXIS",
-  category: "Tools",
+  name: "Lyrics",
+  desc: "Cari lirik lagu (Genius)",
+  category: "Search",
   method: "GET",
-  path: "/cekxl",
+  path: "/lyrics",
 
   params: [
     {
-      name: "number",
+      name: "query",
       type: "query",
       required: true,
       dtype: "string",
-      desc: "Nomor HP (08xxx / 62xxx)"
+      desc: "Judul lagu / artis"
     }
   ],
 
-  example: "/tools/cekxl?number=0817xxxx",
+  example: "/search/lyrics?query=rap+god",
 
   run: async (req, res) => {
     try {
-      let { number } = req.query
+      let { query } = req.query;
 
-      if (!number) {
+      if (!query || !query.trim()) {
         return res.status(400).json({
           status: false,
-          message: "Parameter number wajib diisi"
-        })
+          message: "Parameter query wajib diisi"
+        });
       }
 
-      number = number.replace(/\D/g, '')
+      query = query.trim();
 
-      if (number.startsWith('08')) {
-        number = '62' + number.slice(1)
-      }
+      const searches = await Client.songs.search(query);
 
-      if (!/^62\d{8,15}$/.test(number)) {
-        return res.status(400).json({
-          status: false,
-          message: "Format nomor tidak valid"
-        })
-      }
-
-      const response = await fetch(`https://bendith.my.id/end.php?check=package&number=${number}&version=2`)
-      const data = await response.json()
-
-      if (!data.success) {
+      if (!searches.length) {
         return res.status(404).json({
           status: false,
-          message: "Nomor tidak valid / tidak aktif"
-        })
+          message: `Lagu "${query}" tidak ditemukan`
+        });
       }
+
+      const song = searches[0];
+      const lyrics = await song.lyrics();
+
+      if (!lyrics || !lyrics.trim()) {
+        return res.status(404).json({
+          status: false,
+          message: `Lirik "${query}" tidak ditemukan`
+        });
+      }
+
+      const safeLyrics =
+        lyrics.length > 4000
+          ? lyrics.slice(0, 4000) + "\n\n..."
+          : lyrics;
 
       res.json({
         status: true,
         creator: "Himejima",
-        data: data.data
-      })
+        data: {
+          title: song.title,
+          artist: song.artist?.name,
+          lyrics: safeLyrics,
+        }
+      });
 
     } catch (err) {
+      console.error("[GENIUS LYRICS]", err.message);
+
       res.status(500).json({
         status: false,
         message: err.message
-      })
+      });
     }
   }
-}
+};
