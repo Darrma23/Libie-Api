@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIBIE API — Server Status</title>
+
+<link rel="icon" type="image/png" href="https://i.ibb.co.com/nsD3c6BT/IMG-20260224-WA0023.jpg">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0f1115;
+  --card:#141821;
+  --border:#242a36;
+  --accent:#f6b63c;
+  --green:#22c997;
+  --red:#f06a6a;
+  --text:#e6e9ef;
+  --muted:#aeb6c4;
+  --mono:'JetBrains Mono', monospace;
+  --font:'Sora', sans-serif;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+}
+
+/* HEADER */
+
+header{
+  display:flex;
+  align-items:center;
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+  background:#11151c;
+}
+
+.logo{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+}
+
+.logo-mark{
+  width:34px;
+  height:34px;
+  background:var(--accent);
+  color:#000;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:8px;
+}
+
+main{
+  max-width:1100px;
+  margin:auto;
+  padding:30px 20px 60px;
+}
+
+.grid{
+  display:grid;
+  gap:24px;
+}
+
+@media(min-width:900px){
+  .grid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px;
+}
+
+.card h3{
+  margin:0 0 16px;
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--muted);
+}
+
+pre{
+  margin:0;
+  font-family:var(--mono);
+  font-size:12px;
+  white-space:pre-wrap;
+}
+
+.table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.table td{
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+  font-size:13px;
+}
+
+.table tr:last-child td{
+  border-bottom:none;
+}
+
+.right{
+  text-align:right;
+  font-family:var(--mono);
+}
+
+.green{color:var(--green)}
+.red{color:var(--red)}
+
+.badge{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:600;
+}
+
+.badge.green{background:rgba(34,201,151,.15);color:var(--green)}
+.badge.red{background:rgba(240,106,106,.15);color:var(--red)}
+
+.hero{
+  margin-bottom:30px;
+}
+
+.hero h2{
+  margin:0 0 6px;
+}
+
+.hero small{
+  color:var(--muted);
+}
+
+.bar-group{
+  margin-bottom:18px;
+}
+
+.bar-label{
+  font-size:12px;
+  margin-bottom:6px;
+  color:var(--muted);
+}
+
+.bar{
+  width:100%;
+  height:10px;
+  background:#1c222d;
+  border-radius:6px;
+  overflow:hidden;
+}
+
+.bar-fill{
+  height:100%;
+  width:0%;
+  background:var(--green);
+  transition:width .4s ease;
+}
+
+.bar-text{
+  font-size:12px;
+  margin-top:6px;
+  font-family:var(--mono);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="location.href='/'">
+    <div class="logo-mark">L</div>
+    <div>LIBIE API</div>
+  </div>
+</header>
+
+<main>
+
+<div class="hero">
+  <h2>Server Status</h2>
+  <small id="generatedAt">Loading...</small>
+</div>
+
+<div class="grid">
+
+  <!-- SYSTEM -->
+  <div class="card">
+    <h3>System</h3>
+    <pre id="systemBlock">Loading...</pre>
+  </div>
+
+  <!-- CPU -->
+  <div class="card">
+    <h3>CPU</h3>
+    <table class="table">
+      <tbody id="cpuTable">
+        <tr><td>Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- MEMORY -->
+  <div class="card">
+    <h3>Memory</h3>
+    <table class="table">
+      <tbody id="memoryTable">
+        <tr><td>Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- DISK -->
+  <div class="card">
+    <h3>Disk</h3>
+    <table class="table">
+      <tbody id="diskTable">
+        <tr><td>Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- API -->
+  <div class="card">
+    <h3>API Statistics</h3>
+    <table class="table">
+      <tbody id="apiTable">
+        <tr><td>Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- USAGE GRAPH -->
+<div class="card">
+  <h3>Usage Graph</h3>
+
+  <div class="bar-group">
+    <div class="bar-label">CPU</div>
+    <div class="bar">
+      <div id="cpuBar" class="bar-fill"></div>
+    </div>
+    <div id="cpuBarText" class="bar-text">Loading...</div>
+  </div>
+
+  <div class="bar-group">
+    <div class="bar-label">Memory</div>
+    <div class="bar">
+      <div id="memBar" class="bar-fill"></div>
+    </div>
+    <div id="memBarText" class="bar-text">Loading...</div>
+  </div>
+
+  <div class="bar-group">
+    <div class="bar-label">Disk</div>
+    <div class="bar">
+      <div id="diskBar" class="bar-fill"></div>
+    </div>
+    <div id="diskBarText" class="bar-text">Loading...</div>
+  </div>
+
+</div>
+
+</div>
+
+</main>
+
+<script>
+async function loadStats(){
+  try{
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+
+    const s = d.server;
+    const a = d.api;
+
+    document.getElementById('generatedAt').textContent =
+      "Last update: " + new Date(d.generated_at).toLocaleString();
+
+    /* SYSTEM */
+    document.getElementById('systemBlock').textContent =
+`OS        : ${s.os}
+Kernel    : ${s.kernel}
+Arch      : ${s.arch}
+Hostname  : ${s.hostname}
+Platform  : ${s.platform}
+Uptime    : ${s.uptime}`;
+
+    /* CPU */
+    document.getElementById('cpuTable').innerHTML = `
+<tr><td>Model</td><td class="right">${s.cpu.model}</td></tr>
+<tr><td>Cores</td><td class="right">${s.cpu.cores}</td></tr>
+<tr><td>Load 1m</td><td class="right">${s.cpu.load_1m}</td></tr>
+<tr><td>Usage</td>
+<td class="right ${s.cpu.usage_percent > 90 ? 'red':'green'}">
+${s.cpu.usage_percent}%
+</td></tr>`;
+
+    /* MEMORY */
+    document.getElementById('memoryTable').innerHTML = `
+<tr><td>Total</td><td class="right">${s.memory.total_gb} GB</td></tr>
+<tr><td>Used</td><td class="right">${s.memory.used_gb} GB</td></tr>
+<tr><td>Free</td><td class="right">${s.memory.free_gb} GB</td></tr>
+<tr><td>Usage</td><td class="right">${s.memory.usage_percent}%</td></tr>`;
+
+    /* DISK */
+    document.getElementById('diskTable').innerHTML = `
+<tr><td>Total</td><td class="right">${s.disk.total}</td></tr>
+<tr><td>Used</td><td class="right">${s.disk.used}</td></tr>
+<tr><td>Free</td><td class="right">${s.disk.free}</td></tr>
+<tr><td>Usage</td><td class="right">${s.disk.percent}</td></tr>`;
+
+    /* API */
+    document.getElementById('apiTable').innerHTML = `
+<tr><td>Total Endpoints</td><td class="right">${a.total_endpoints}</td></tr>
+<tr><td>Active Users</td><td class="right green">${a.active_users}</td></tr>
+<tr><td>Total Reports</td><td class="right">${a.total_reports}</td></tr>
+<tr><td>Hit Today</td><td class="right">${a.total_hits_today}</td></tr>
+<tr><td>Hit All Time</td><td class="right">${a.total_hits_all}</td></tr>`;
+
+/* USAGE GRAPH */
+const cpuUsage = parseFloat(s.cpu.usage_percent);
+const memUsage = parseFloat(s.memory.usage_percent);
+const diskUsage = parseFloat(s.disk.percent);
+
+function setBar(id, textId, value){
+  const bar = document.getElementById(id);
+  const text = document.getElementById(textId);
+
+  bar.style.width = value + "%";
+
+  if(value > 90){
+    bar.style.background = "var(--red)";
+  } else if(value > 70){
+    bar.style.background = "var(--accent)";
+  } else {
+    bar.style.background = "var(--green)";
+  }
+
+  text.textContent = value + "%";
+}
+
+setBar("cpuBar","cpuBarText", cpuUsage);
+setBar("memBar","memBarText", memUsage);
+setBar("diskBar","diskBarText", diskUsage);
+
+  } catch(err){
+    console.error(err);
+  }
+}
+
+loadStats();
+setInterval(loadStats, 3000);
+</script>
+
+</body>
+</html>

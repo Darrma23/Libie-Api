@@ -340,11 +340,11 @@ async function init() {
   if (docsR && docsR.ok) {
     try {
       const d = await docsR.json();
-      document.getElementById('hdrVer').textContent = d.version ? String(d.version).slice(0,20) : 'v1.0.0';
+      document.getElementById('hdrVer').textContent = d.version ? String(d.version).slice(0,20) : 'v1.1.0';
       document.getElementById('hdrEp').textContent  = (parseInt(d.total_endpoints) || 0) + ' endpoints';
       docs = {};
       (d.apis || []).forEach(api => {
-        const cat = api.kategori || 'Other';
+        const cat = api.kategori || api.category || 'Other';
       
         if (!docs[cat]) docs[cat] = [];
       
@@ -616,7 +616,7 @@ function mkBodyField(ep, uid) {
 }
 
 function buildRealtimeCurl(ep, uid) {
-  let baseUrl = location.origin + (ep.example?.url || ep.path);
+  let baseUrl = location.origin + ep.path;
   let url = baseUrl;
   let qp = [];
   let hasUserInput = false;
@@ -679,7 +679,7 @@ function mkCurlSection(ep, uid) {
 }
 
 function mkCodeExSection(ep, uid) {
-  const url=location.origin+(ep.example?.url||ep.path);
+  const url = location.origin + ep.path;
   const body=(ep.bodyParams||[]).length?(ep.example?.body?JSON.stringify(ep.example.body,null,2):'{}'):null;
   const isP=['POST','PUT','PATCH'].includes(ep.method);
   const codes={

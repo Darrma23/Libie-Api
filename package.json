@@ -1,6 +1,6 @@
 {
   "name": "libie-api",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "REST API modular dengan auto plugin loading + frontend Tailwind CDN",
   "main": "server.js",
   "type": "commonjs",
@@ -10,7 +10,6 @@
     "build": "echo \"No build step required\""
   },
   "dependencies": {
-    "@brandond/findthelyrics": "^2.0.5",
     "acrcloud": "^1.4.0",
     "axios": "^1.13.5",
     "cheerio": "^1.2.0",
@@ -21,14 +20,10 @@
     "express-rate-limit": "^7.4.0",
     "fast-xml-parser": "^5.3.6",
     "form-data": "^4.0.0",
-    "genius-lyrics": "^4.4.7",
-    "lyrics-finder": "^21.7.0",
     "morgan": "^1.10.0",
-    "puppeteer": "^24.37.5",
     "qs": "^6.15.0",
     "redis": "^5.11.0",
     "uuid": "^13.0.0",
-    "yt-search": "^2.13.1",
     "zencf": "^2.0.3"
   },
   "imports": {

@@ -4,6 +4,8 @@ const fs = require('fs');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const os = require('os');
+const { execSync } = require('child_process');
 
 const { ipLimiter, getIP, LIMIT } = require('./lib/iplimiter');
 const redis = require('./lib/redis');
@@ -22,10 +24,17 @@ function clean(str) {
     .trim();
 }
 
-/* ================= ROUTER ================= */
+const CATEGORY_PREFIX = {
+  downloader: '/download',
+  anime: '/anime',
+  ai: '/ai',
+  tools: '/tools',
+  info: '/info'
+};
 
-let pluginRouter = express.Router();
-app.use(pluginRouter);
+function resolvePrefix(category) {
+  return CATEGORY_PREFIX[String(category).toLowerCase()] || '/other';
+}
 
 /* ================= GLOBAL MIDDLEWARE ================= */
 
@@ -43,6 +52,26 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended:true }));
 app.use(express.static(path.join(__dirname,'public')));
+
+/* ================= PLUGIN ROUTER ================= */
+
+let pluginRouter = express.Router();
+
+/* ================= HIT COUNTER (PLUGIN ONLY) ================= */
+
+pluginRouter.use(async (req, res, next) => {
+  try {
+    await redis.incr('stats:hits:all');
+    await redis.incr('stats:hits:today');
+    await redis.expire('stats:hits:today', 60 * 60 * 24);
+  } catch (err) {
+    console.error("Hit counter error:", err.message);
+  }
+  next();
+});
+
+app.use('/api', pluginRouter);
+
 
 /* ================= CREATOR INJECTION ================= */
 
@@ -62,113 +91,91 @@ app.use((req, res, next) => {
 /* ================= LOAD PLUGINS ================= */
 
 function loadPlugins() {
+
+  pluginRouter.stack = []; // reset route lama
+
   const pluginsDir = path.join(__dirname, 'plugins');
   const apiList = [];
   let registeredCount = 0;
 
-  pluginRouter.stack = [];
-
   if (!fs.existsSync(pluginsDir)) {
-    console.log('⚠ Folder plugins tidak ditemukan.');
     global.apiList = [];
     return { count: 0, list: [] };
   }
 
-  const categories = fs.readdirSync(pluginsDir).filter(file => {
-    const fullPath = path.join(pluginsDir, file);
-    return fs.statSync(fullPath).isDirectory();
-  });
+  const categories = fs.readdirSync(pluginsDir).filter(file =>
+    fs.statSync(path.join(pluginsDir, file)).isDirectory()
+  );
 
   categories.forEach(category => {
+
     const categoryPath = path.join(pluginsDir, category);
     const files = fs.readdirSync(categoryPath).filter(f => f.endsWith('.js'));
 
     files.forEach(file => {
-      const filePath = path.join(categoryPath, file);
 
+      const filePath = path.join(categoryPath, file);
       delete require.cache[require.resolve(filePath)];
 
       let plugin;
       try {
         plugin = require(filePath);
       } catch (err) {
-        console.error(`✖ Gagal load plugin ${file}:`, err.message);
+        console.error(`✖ Gagal load ${file}:`, err.message);
         return;
       }
 
-      if (!plugin.name || !plugin.desc || !plugin.method || !plugin.path || typeof plugin.run !== 'function') {
+      if (!plugin.name || !plugin.method || !plugin.path || typeof plugin.run !== 'function') {
         console.error(`✖ Plugin ${file} tidak valid`);
         return;
       }
 
-      if (!plugin.category) {
-        plugin.category = category.charAt(0).toUpperCase() + category.slice(1);
-      }
-
       const method = plugin.method.toLowerCase();
+      const basePath = plugin.path.startsWith('/') ? plugin.path : '/' + plugin.path;
 
-      let fullPath = plugin.path.startsWith('/') ? plugin.path : '/' + plugin.path;
-      fullPath = `/${plugin.category.toLowerCase()}${fullPath}`.replace(/\/+/g, '/');
+      const prefix = resolvePrefix(plugin.category || category);
+      const fullPath = `${prefix}${basePath}`.replace(/\/+/g, '/');
 
-      if (['get', 'post', 'put', 'delete', 'patch'].includes(method)) {
+      pluginRouter[method](fullPath, async (req, res) => {
+        try {
+          await plugin.run(req, res);
+        } catch (err) {
+          res.status(500).json({
+            status: false,
+            message: err.message
+          });
+        }
+      });
 
-        pluginRouter[method](fullPath, async (req, res) => {
-          try {
-            await plugin.run(req, res);
-          } catch (err) {
-            console.error(`🔥 Error di ${fullPath}:`, err.message);
-            res.status(500).json({
-              status: false,
-              message: err.message,
-              timestamp: new Date().toISOString()
-            });
-          }
-        });
+      registeredCount++;
 
-        console.log(`✔ ${method.toUpperCase()} ${fullPath}`);
-        registeredCount++;
+      const normalizedParams = Array.isArray(plugin.params)
+        ? plugin.params.map(p => {
+            return {
+              nama: p.nama || p.name || '',
+              tipe: p.tipe || p.type || 'query',
+              required: p.required ?? true,
+              dtype: p.dtype || 'string',
+              desc: p.desc || ''
+            };
+          })
+        : [];
+      
+      apiList.push({
+        nama: plugin.name,
+        deskripsi: plugin.desc,
+        kategori: plugin.category || category,
+        method: plugin.method.toUpperCase(),
+        endpoint: `/api${fullPath}`,
+        parameter: normalizedParams,
+        contoh: plugin.example || ''
+      });
 
-        const normalizedParams = Array.isArray(plugin.params)
-          ? plugin.params.map(p => {
-              if (typeof p === 'string') {
-                return {
-                  nama: p,
-                  tipe: 'query',
-                  required: true,
-                  dtype: 'string',
-                  desc: ''
-                };
-              }
-
-              return {
-                nama: p.name || 'unknown',
-                tipe: p.type || 'query',
-                required: p.required ?? true,
-                dtype: p.dtype || 'string',
-                desc: p.desc || ''
-              };
-            })
-          : [];
-
-        apiList.push({
-          nama: clean(plugin.name),
-          deskripsi: clean(plugin.desc),
-          kategori: clean(plugin.category),
-          method: clean(plugin.method.toUpperCase()),
-          endpoint: clean(fullPath),
-          parameter: normalizedParams,
-          contoh: clean(
-            typeof plugin.example === 'string'
-              ? plugin.example
-              : plugin.example?.url
-          )
-        });
-      }
+      console.log(`✔ ${method.toUpperCase()} /api${fullPath}`);
     });
   });
 
   global.apiList = apiList;
-
   return { count: registeredCount, list: apiList };
 }
 
@@ -178,24 +185,12 @@ let { count, list: apiList } = loadPlugins();
 
 /* ================= WATCHER ================= */
 
-let reloadTimer = null;
-
-fs.watch(path.join(__dirname, 'plugins'), { recursive: true }, (eventType, filename) => {
+fs.watch(path.join(__dirname, 'plugins'), { recursive: true }, (event, filename) => {
   if (!filename || !filename.endsWith('.js')) return;
-
-  console.log(`🔄 Change detected: ${filename}`);
-
-  clearTimeout(reloadTimer);
-
-  reloadTimer = setTimeout(() => {
-    console.log('♻ Reloading plugins...');
-
-    const result = loadPlugins();
-    count = result.count;
-    apiList = result.list;
-
-    console.log(`🚀 Plugins reloaded. Total: ${count}\n`);
-  }, 300);
+  console.log('♻ Reload plugin...');
+  const result = loadPlugins();
+  count = result.count;
+  apiList = result.list;
 });
 
 /* ================= API INFO ================= */
@@ -325,22 +320,99 @@ app.post('/api/user-report', async (req, res) => {
 
 /* ================= STATUS API ================= */
 app.get('/api/stats', async (req, res) => {
+  const start = Date.now();
+
   try {
+    const exec = (cmd) => {
+      try { return execSync(cmd).toString().trim(); }
+      catch { return "N/A"; }
+    };
+
+    /* ================= SYSTEM ================= */
+    const load = os.loadavg();
+    const cores = os.cpus().length;
+
+    const memTotal = os.totalmem();
+    const memFree = os.freemem();
+    const memUsed = memTotal - memFree;
+
+    const diskRaw = exec("df -h / | tail -1").split(/\s+/);
+
+    /* ================= API STATS ================= */
     const totalReports = (await redis.keys('report:*')).length;
-    const totalQuota   = (await redis.keys('quota:*')).length;
+    const totalUsers   = (await redis.keys('quota:*')).length;
+    const totalHitsAll = Number(await redis.get('stats:hits:all')) || 0;
+    const totalHitsToday = Number(await redis.get('stats:hits:today')) || 0;
+
+    const cpuUsage = ((load[0] / cores) * 100);
+    const memUsage = ((memUsed / memTotal) * 100);
+
+    /* ================= WARNINGS ================= */
+    const warnings = [];
+
+    if (cpuUsage > 90)
+      warnings.push("CRITICAL: CPU overload");
+
+    if (memUsage > 85)
+      warnings.push("WARNING: High memory usage");
 
     res.json({
       status: true,
-      reports: totalReports,
-      active_users: totalQuota,
-      memory: (process.memoryUsage().rss / 1024 / 1024).toFixed(2) + ' MB',
-      uptime: process.uptime().toFixed(0) + 's'
+
+      server: {
+        os: exec("lsb_release -ds || uname -o"),
+        kernel: os.release(),
+        arch: os.arch(),
+        platform: os.platform(),
+        hostname: os.hostname(),
+        uptime: exec("uptime -p"),
+
+        cpu: {
+          model: os.cpus()[0]?.model,
+          cores,
+          load_1m: load[0],
+          load_5m: load[1],
+          load_15m: load[2],
+          usage_percent: cpuUsage.toFixed(2)
+        },
+
+        memory: {
+          total_gb: (memTotal / 1024 / 1024 / 1024).toFixed(2),
+          used_gb: (memUsed / 1024 / 1024 / 1024).toFixed(2),
+          free_gb: (memFree / 1024 / 1024 / 1024).toFixed(2),
+          usage_percent: memUsage.toFixed(2)
+        },
+
+        disk: {
+          total: diskRaw[1] || "N/A",
+          used: diskRaw[2] || "N/A",
+          free: diskRaw[3] || "N/A",
+          percent: diskRaw[4] || "N/A"
+        }
+      },
+
+      api: {
+        total_endpoints: apiList.length,
+        active_users: totalUsers,
+        total_reports: totalReports,
+        total_hits_today: totalHitsToday,
+        total_hits_all: totalHitsAll
+      },
+
+      process: {
+        node_version: process.version,
+        rss_mb: (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
+      },
+
+      warnings,
+      collection_time_ms: Date.now() - start,
+      generated_at: new Date().toISOString()
     });
 
   } catch (err) {
     res.status(500).json({
       status: false,
-      error: err.message
+      message: err.message
     });
   }
 });
@@ -365,6 +437,10 @@ app.post('/api/run-notify', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/server', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'server.html'));
 });
 
 /* ================= 404 HANDLER ================= */
