@@ -393,27 +393,36 @@ function buildAll(d) {
 function mkCatItem(cat, eps, isMob) {
   const pal  = catPalette(cat);
   const abbr = catAbbr(cat);
-  const wrap = el('div','scat'); wrap.dataset.cat=cat;
-  const hd   = el('div','scath'+(cat===activeCat?' on':''));
-
+  const wrap = el('div','scat');
+  wrap.dataset.cat = cat;
+  const hd = el('div','scath' + (cat === activeCat ? ' on' : ''));
   const ico = el('span','cat-icon');
   ico.style.cssText = `background:${pal.bg};border:1px solid ${pal.border};color:${pal.text}`;
   ico.textContent = abbr;
-
-  const nm  = el('span','nm');  nm.textContent = cat;
-  const cnt = el('span','cnt'); cnt.textContent = eps.length;
-  const arr = el('span','arr'); arr.textContent = '›';
+  const nm  = el('span','nm');
+  nm.textContent = cat;
+  const cnt = el('span','cnt');
+  cnt.textContent = eps.length;
+  const arr = el('span','arr');
+  arr.textContent = '›';
   hd.append(ico, nm, cnt, arr);
-
   const body = el('div','seps');
-  eps.forEach(ep=>body.appendChild(mkSepItem(ep,isMob)));
-  hd.addEventListener('click',()=>{
-    const isOn=hd.classList.contains('on');
-    hd.closest('.sb-sc,#mobCatList')?.querySelectorAll('.scath.on').forEach(h=>{if(h!==hd)h.classList.remove('on');});
-    hd.classList.toggle('on',!isOn);
-    if(!isOn){pickCat(cat,false);if(isMob)mobGo('eps');}
+  eps.forEach(ep => body.appendChild(mkSepItem(ep, isMob)));
+  hd.addEventListener('click', () => {
+    const isOn = hd.classList.contains('on');
+    hd.closest('.sb-sc,#mobCatList')
+      ?.querySelectorAll('.scath.on')
+      .forEach(h => {
+        if (h !== hd) h.classList.remove('on');
+      });
+    hd.classList.toggle('on', !isOn);
+    if (!isOn) {
+      activeCat = cat;
+      pickCat(cat, false); // hanya render endpoint panel
+    }
   });
-  wrap.append(hd,body);
+
+  wrap.append(hd, body);
   return wrap;
 }
 

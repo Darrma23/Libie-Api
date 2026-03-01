@@ -26,9 +26,6 @@
     "uuid": "^13.0.0",
     "zencf": "^2.0.3"
   },
-  "imports": {
-    "#lib/*": "./lib/*"
-  },
   "devDependencies": {
     "nodemon": "^3.1.0"
   },

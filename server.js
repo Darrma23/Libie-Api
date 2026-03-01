@@ -1,3 +1,4 @@
+const pkg = require('./package.json');
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -45,33 +46,28 @@ const limiter = rateLimit({
 });
 
 app.use('/', limiter);
+let pluginRouter = express.Router();
+app.use('/api', async (req, res, next) => {
+  try {
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    await redis.incr('stats:hits:all');
+    await redis.incr(`stats:hits:day:${todayKey}`);
+
+  } catch (err) {
+    console.error('Hit counter error:', err.message);
+  }
+
+  next();
+});
 app.use(ipLimiter);
+app.use('/api', pluginRouter);
 
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended:true }));
 app.use(express.static(path.join(__dirname,'public')));
-
-/* ================= PLUGIN ROUTER ================= */
-
-let pluginRouter = express.Router();
-
-/* ================= HIT COUNTER (PLUGIN ONLY) ================= */
-
-pluginRouter.use(async (req, res, next) => {
-  try {
-    await redis.incr('stats:hits:all');
-    await redis.incr('stats:hits:today');
-    await redis.expire('stats:hits:today', 60 * 60 * 24);
-  } catch (err) {
-    console.error("Hit counter error:", err.message);
-  }
-  next();
-});
-
-app.use('/api', pluginRouter);
-
 
 /* ================= CREATOR INJECTION ================= */
 
@@ -200,7 +196,7 @@ app.get('/api/info', (req, res) => {
     res.status(200).json({
       status: true,
       server: "LIBIE API",
-      version: "1.0.0",
+      version: pkg.version,
       total_endpoints: apiList.length,
       endpoint_categories: [...new Set(apiList.map(api => api.kategori))],
       apis: apiList
@@ -321,7 +317,8 @@ app.post('/api/user-report', async (req, res) => {
 /* ================= STATUS API ================= */
 app.get('/api/stats', async (req, res) => {
   const start = Date.now();
-
+  const todayKey = new Date().toISOString().slice(0, 10);
+  
   try {
     const exec = (cmd) => {
       try { return execSync(cmd).toString().trim(); }
@@ -342,7 +339,7 @@ app.get('/api/stats', async (req, res) => {
     const totalReports = (await redis.keys('report:*')).length;
     const totalUsers   = (await redis.keys('quota:*')).length;
     const totalHitsAll = Number(await redis.get('stats:hits:all')) || 0;
-    const totalHitsToday = Number(await redis.get('stats:hits:today')) || 0;
+    const totalHitsToday =Number(await redis.get(`stats:hits:day:${todayKey}`)) || 0;
 
     const cpuUsage = ((load[0] / cores) * 100);
     const memUsage = ((memUsed / memTotal) * 100);
